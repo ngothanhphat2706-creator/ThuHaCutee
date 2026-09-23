@@ -137,7 +137,7 @@
     }
 
     async function resetAll() {
-        if (prompt("Mật khẩu xóa (123456):") === "123456") {
+        if (prompt("Mật khẩu xóa (Đố biết luôn):") === "thuhadethuong") {
             await fetch(DB_ENDPOINT, { method: "DELETE" });
             currentVotes = [];
             renderUI();
