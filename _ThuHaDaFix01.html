@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bình Chọn Khí Chất</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 12px; }
+        .box { width: 100%; max-width: 480px; background: #1e293b; border-radius: 16px; padding: 20px; border: 1px solid #334155; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        h1 { font-size: 1.25rem; text-align: center; margin-bottom: 4px; color: #f472b6; }
+        .status { text-align: center; font-size: 0.75rem; color: #38bdf8; margin-bottom: 16px; word-break: break-all; }
+        
+        .field-group { margin-bottom: 12px; }
+        input, select { 
+            width: 100%; padding: 14px; background: #0f172a; border: 1px solid #475569; 
+            border-radius: 10px; color: #fff; font-size: 1rem; outline: none; 
+            -webkit-user-select: text; user-select: text;
+        }
+        input:focus, select:focus { border-color: #818cf8; }
+        
+        .btn-submit { width: 100%; padding: 14px; background: linear-gradient(135deg, #6366f1, #ec4899); color: #fff; border: none; border-radius: 10px; font-size: 1rem; font-weight: bold; cursor: pointer; margin-top: 4px; }
+        .btn-submit:active { opacity: 0.8; transform: scale(0.98); }
+
+        .charts { display: flex; justify-content: space-around; align-items: flex-end; height: 180px; border-bottom: 2px solid #334155; gap: 8px; margin-top: 25px; padding-bottom: 4px; }
+        .col { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; }
+        .val { font-size: 0.85rem; font-weight: bold; margin-bottom: 4px; }
+        .bar { width: 100%; max-width: 40px; border-radius: 6px 6px 0 0; transition: height 0.3s ease; min-height: 4px; }
+        .b1 { background: #ef4444; } .b2 { background: #3b82f6; } .b3 { background: #10b981; } .b4 { background: #a855f7; }
+        .lbl { margin-top: 8px; font-size: 0.75rem; color: #94a3b8; text-align: center; font-weight: 600; }
+        
+        .footer { display: flex; justify-content: space-between; margin-top: 16px; font-size: 0.85rem; color: #94a3b8; align-items: center; }
+        .reset { background: transparent; border: 1px solid #334155; color: #94a3b8; padding: 6px 12px; border-radius: 6px; font-size: 0.75rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="box">
+    <h1>Bình Chọn Khí Chất</h1>
+    <div class="status" id="st">🟡 Đang kết nối...</div>
+    
+    <div class="field-group">
+        <input type="text" id="voter_name" placeholder="Nhập tên của bạn..." autocomplete="off">
+    </div>
+
+    <div class="field-group">
+        <select id="voter_type">
+            <option value="" disabled selected>-- Chọn loại khí chất --</option>
+            <option value="nongnay">Nóng Nảy</option>
+            <option value="linhhoat">Linh Hoạt</option>
+            <option value="diemtinh">Điềm Tĩnh</option>
+            <option value="uutu">Ưu Tư</option>
+        </select>
+    </div>
+
+    <button type="button" class="btn-submit" onclick="submitData()">GỬI BÌNH CHỌN</button>
+
+    <div class="charts">
+        <div class="col"><span class="val" id="v-nongnay">0</span><div class="bar b1" id="b-nongnay" style="height:0%"></div><span class="lbl">Nóng Nảy</span></div>
+        <div class="col"><span class="val" id="v-linhhoat">0</span><div class="bar b2" id="b-linhhoat" style="height:0%"></div><span class="lbl">Linh Hoạt</span></div>
+        <div class="col"><span class="val" id="v-diemtinh">0</span><div class="bar b3" id="b-diemtinh" style="height:0%"></div><span class="lbl">Điềm Tĩnh</span></div>
+        <div class="col"><span class="val" id="v-uutu">0</span><div class="bar b4" id="b-uutu" style="height:0%"></div><span class="lbl">Ưu Tư</span></div>
+    </div>
+
+    <div class="footer">
+        <span>Tổng lượt: <strong id="total" style="color:#fff">0</strong></span>
+        <button class="reset" onclick="resetAll()">Xóa tất cả</button>
+    </div>
+</div>
+
+<script>
+    // Đã chèn sẵn link Firebase chuẩn của bạn
+    const FIREBASE_URL = "https://yeu-thuha-default-rtdb.asia-southeast1.firebasedatabase.app";
+
+    const DB_ENDPOINT = FIREBASE_URL.replace(/\/$/, "") + "/votes.json";
+    let currentVotes = [];
+
+    async function syncData() {
+        try {
+            let res = await fetch(DB_ENDPOINT, { cache: "no-store" });
+            if (res.ok) {
+                let data = await res.json();
+                currentVotes = data ? Object.values(data) : [];
+                renderUI();
+                document.getElementById('st').innerText = "🟢 Trực tuyến - Đã đồng bộ";
+            } else {
+                document.getElementById('st').innerText = "🔴 Lỗi " + res.status + ": Kiểm tra lại tab Rules trên Firebase";
+            }
+        } catch (e) {
+            document.getElementById('st').innerText = "🔴 Lỗi kết nối tới Server";
+        }
+    }
+
+    async function submitData() {
+        let nameEl = document.getElementById('voter_name');
+        let typeEl = document.getElementById('voter_type');
+        let name = nameEl.value.trim();
+        let type = typeEl.value;
+
+        if (!name) { alert("Vui lòng nhập tên!"); nameEl.focus(); return; }
+        if (!type) { alert("Vui lòng chọn loại khí chất!"); return; }
+
+        let newEntry = { name: name, type: type, timestamp: Date.now() };
+
+        try {
+            let res = await fetch(DB_ENDPOINT, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(newEntry)
+            });
+
+            if (res.ok) {
+                nameEl.value = '';
+                typeEl.selectedIndex = 0;
+                syncData();
+            } else {
+                alert("Gửi thất bại! Kiểm tra tab Rules trên Firebase.");
+            }
+        } catch (err) {
+            alert("Lỗi kết nối mạng!");
+        }
+    }
+
+    function renderUI() {
+        let counts = { nongnay: 0, linhhoat: 0, diemtinh: 0, uutu: 0 };
+        currentVotes.forEach(item => { if (item && counts[item.type] !== undefined) counts[item.type]++; });
+
+        document.getElementById('total').innerText = currentVotes.length;
+        let max = Math.max(counts.nongnay, counts.linhhoat, counts.diemtinh, counts.uutu, 1);
+
+        for (let k in counts) {
+            document.getElementById(`v-${k}`).innerText = counts[k];
+            let percent = (counts[k] / max) * 100;
+            if (counts[k] > 0 && percent < 8) percent = 8;
+            document.getElementById(`b-${k}`).style.height = percent + '%';
+        }
+    }
+
+    async function resetAll() {
+        if (prompt("Mật khẩu xóa (123456):") === "123456") {
+            await fetch(DB_ENDPOINT, { method: "DELETE" });
+            currentVotes = [];
+            renderUI();
+            alert("Đã xóa sạch dữ liệu!");
+        }
+    }
+
+    syncData();
+    setInterval(syncData, 2000);
+</script>
+
+</body>
+</html>
